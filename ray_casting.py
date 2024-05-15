@@ -1,22 +1,23 @@
 import pygame
 from settings import *
 from map import world_map, WORLD_WIDTH, WORLD_HEIGHT
+from numba import njit
 
-
+@njit(fastmath=True, cache=True)
 def mapping(a, b):
-    return (a // TILE) * TILE, (b // TILE) * TILE
+    return int(a // TILE) * TILE, int(b // TILE) * TILE
 
-
-def ray_casting(player, textures):
-    walls = []
-    ox, oy = player.pos
+@njit(fastmath=True, cache=True)
+def ray_casting(player_pos, player_angle, world_map):
+    casted_walls = []
+    ox, oy = player_pos
     texture_v, texture_h = 1, 1
     xm, ym = mapping(ox, oy)
-    cur_angle = player.angle - HALF_FOV
+    cur_angle = player_angle - HALF_FOV
     for ray in range(NUM_RAYS):
         sin_a = math.sin(cur_angle)
-        cos_a = math.cos(cur_angle)
         sin_a = sin_a if sin_a else 0.000001
+        cos_a = math.cos(cur_angle)
         cos_a = cos_a if cos_a else 0.000001
 
         # verticals
@@ -44,14 +45,32 @@ def ray_casting(player, textures):
         # projection
         depth, offset, texture = (depth_v, yv, texture_v) if depth_v < depth_h else (depth_h, xh, texture_h)
         offset = int(offset) % TILE
-        depth *= math.cos(player.angle - cur_angle)
+        depth *= math.cos(player_angle - cur_angle)
         depth = max(depth, 0.00001)
-        proj_height = min(int(PROJ_COEFF / depth), PENTA_HEIGHT)
+        proj_height = int(PROJ_COEFF / depth)
 
-        wall_column = textures[texture].subsurface(offset * TEXTURE_SCALE, 0, TEXTURE_SCALE, TEXTURE_HEIGHT)
-        wall_column = pygame.transform.scale(wall_column, (SCALE, proj_height))
-        wall_pos = (ray * SCALE, HALF_HEIGHT - proj_height // 2)
+        casted_walls.append((depth, offset, proj_height, texture))
+        cur_angle += DELTA_ANGLE
+    return casted_walls
+
+def ray_casting_walls(player, textures):
+    casted_walls = ray_casting(player.pos, player.angle, world_map)
+    wall_shot = casted_walls[CENTER_RAY][0], casted_walls[CENTER_RAY][2]
+    walls = []
+    for ray, casted_values in enumerate(casted_walls):
+        depth, offset, proj_height, texture = casted_values
+        if proj_height > HEIGHT:
+            coeff = proj_height / HEIGHT
+            texture_height = TEXTURE_HEIGHT / coeff
+            wall_column = textures[texture].subsurface(offset * TEXTURE_SCALE,
+                                                       HALF_TEXTURE_HEIGHT - texture_height // 2,
+                                                       TEXTURE_SCALE, texture_height)
+            wall_column = pygame.transform.scale(wall_column, (SCALE, HEIGHT))
+            wall_pos = (ray * SCALE, 0)
+        else:
+            wall_column = textures[texture].subsurface(offset * TEXTURE_SCALE, 0, TEXTURE_SCALE, TEXTURE_HEIGHT)
+            wall_column = pygame.transform.scale(wall_column, (SCALE, proj_height))
+            wall_pos = (ray * SCALE, HALF_HEIGHT - proj_height // 2)
 
         walls.append((depth, wall_column, wall_pos))
-        cur_angle += DELTA_ANGLE
-    return walls
+    return walls, wall_shot

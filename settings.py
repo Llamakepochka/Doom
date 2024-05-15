@@ -37,12 +37,13 @@ FAKE_RAYS_RANGE = NUM_RAYS - 1 + 2 * FAKE_RAYS
 # texture settings (1200 x 1200)
 TEXTURE_WIDTH = 1200
 TEXTURE_HEIGHT = 1200
+HALF_TEXTURE_HEIGHT = TEXTURE_HEIGHT // 2
 TEXTURE_SCALE = TEXTURE_WIDTH // TILE
 
 # player settings
 player_pos = (HALF_WIDTH // 4, HALF_HEIGHT - 50)
 player_angle = 0
-player_speed = 2
+player_speed = 3
 
 # colors
 WHITE = (255, 255, 255)
